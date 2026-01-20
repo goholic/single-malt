@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -99,10 +100,17 @@ func handlePublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Auto-generate Slug from Title if missing (Simple SEO logic)
+	// Auto-generate Slug if missing
 	if p.Slug == "" {
-		p.Slug = strings.ToLower(strings.ReplaceAll(p.Title, " ", "-"))
+		// 1. Lowercase
+		s := strings.ToLower(p.Title)
+		// 2. Remove anything that isn't a-z, 0-9, or space
+		reg := regexp.MustCompile("[^a-z0-9 ]+")
+		s = reg.ReplaceAllString(s, "")
+		// 3. Replace spaces with hyphens
+		p.Slug = strings.ReplaceAll(s, " ", "-")
 	}
+
 	p.PublishedAt = time.Now()
 
 	_, err := db.Exec(`
