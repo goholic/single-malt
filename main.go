@@ -28,7 +28,7 @@ func initDB() {
 	var err error
 
 	// just create a single db file malt.db
-	db, err := sql.Open("sqlite", "malt.db")
+	db, err = sql.Open("sqlite", "malt.db")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func main() {
 	// This serves index.html for any route that doesn't match above (e.g., /post/my-slug)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Serve index.html directly
-		http.ServeFile(w, r, "index.html")
+		http.ServeFile(w, r, "static/index.html")
 	})
 
 	log.Println("Malt running on :8080")
