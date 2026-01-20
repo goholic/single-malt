@@ -1,0 +1,35 @@
+# --- Binaries & OS Specific ---
+# The compiled binary name
+malt
+
+# Standard binary extensions (in case you build on Windows/Mac)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# --- Database (CRITICAL) ---
+# Never commit the live database or its temp journal files
+*.db
+*.db-journal
+*.sqlite
+
+# --- Secrets & Config ---
+# Even though we use systemd, it's safe to ignore .env just in case
+.env
+
+# --- User Content ---
+# Folder for local post drafts/JSONs 
+posts/
+
+# --- IDEs & Editors ---
+.vscode/
+.idea/
+.DS_Store
+
+# --- Go Specific ---
+vendor/
+go.work

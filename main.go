@@ -122,6 +122,72 @@ func handlePublish(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, map[string]string{"status": "published", "link": "/post/" + p.Slug})
 }
 
+// DELETE /api/posts/{slug} - Remove a post
+func handleDeletePost(w http.ResponseWriter, r *http.Request) {
+	// 1. Auth Check
+	if r.Header.Get("X-MALT-KEY") != os.Getenv("MALT_SECRET") {
+		http.Error(w, "Go away", 401)
+		return
+	}
+
+	slug := r.PathValue("slug")
+
+	// 2. Execute Delete
+	result, err := db.Exec("DELETE FROM posts WHERE slug = ?", slug)
+	if err != nil {
+		http.Error(w, "Database error: "+err.Error(), 500)
+		return
+	}
+
+	// 3. Verify if anything was actually deleted
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		http.Error(w, "Post not found", 404)
+		return
+	}
+
+	jsonResponse(w, map[string]string{"status": "deleted", "slug": slug})
+}
+
+// PUT /api/posts/{slug} - Update an existing post
+func handleUpdatePost(w http.ResponseWriter, r *http.Request) {
+	// 1. Auth Check
+	if r.Header.Get("X-MALT-KEY") != os.Getenv("MALT_SECRET") {
+		http.Error(w, "Go away", 401)
+		return
+	}
+
+	slug := r.PathValue("slug")
+
+	// 2. Parse the updates
+	var p Post
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		http.Error(w, "Bad JSON", 400)
+		return
+	}
+
+	// 3. Execute Update (We do NOT update the slug or published_at to preserve history/links)
+	// We only update Title, Description, and Content.
+	result, err := db.Exec(`
+        UPDATE posts 
+        SET title = ?, description = ?, content = ? 
+        WHERE slug = ?
+    `, p.Title, p.Description, p.Content, slug)
+
+	if err != nil {
+		http.Error(w, "Database error: "+err.Error(), 500)
+		return
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		http.Error(w, "Post not found", 404)
+		return
+	}
+
+	jsonResponse(w, map[string]string{"status": "updated", "slug": slug})
+}
+
 // Helper for JSON
 func jsonResponse(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -140,6 +206,9 @@ func main() {
 	mux.HandleFunc("GET /api/posts/{slug}", handleGetPost)
 	mux.HandleFunc("POST /api/publish", handlePublish)
 
+	// --- NEW ROUTES ---
+	mux.HandleFunc("DELETE /api/posts/{slug}", handleDeletePost)
+	mux.HandleFunc("PUT /api/posts/{slug}", handleUpdatePost)
 	// 2. Serve Frontend (SPA Catch-all)
 	// This serves index.html for any route that doesn't match above (e.g., /post/my-slug)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
