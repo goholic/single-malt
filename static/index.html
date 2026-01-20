@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goholic.in</title>
+    <meta name="description" content="A minimal go blog.">
+    
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #1a1a1a;
+            --accent: #0070f3; /* Go-ish Blue */
+            --gray: #666;
+            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* Dark Mode Support (Adaptive) */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #111111;
+                --text: #e1e1e1;
+                --accent: #4da3ff;
+                --gray: #a1a1a1;
+            }
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* Central Column Layout */
+        main {
+            max-width: 680px; /* Optimal reading width */
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* Typography */
+        h1, h2, h3 { margin-top: 2rem; letter-spacing: -0.02em; }
+        a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--gray); }
+        a:hover { color: var(--accent); border-color: var(--accent); }
+        
+        .nav-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: baseline; 
+            margin-bottom: 3rem; 
+            border-bottom: 1px solid #33333320;
+            padding-bottom: 1rem;
+        }
+        .logo { font-weight: 700; font-size: 1.2rem; border: none; }
+        
+        /* Blog List Styles */
+        .post-item { margin-bottom: 2.5rem; display: block; border: none; }
+        .post-item:hover .post-title { color: var(--accent); }
+        .post-date { font-size: 0.85rem; color: var(--gray); display: block; margin-bottom: 0.25rem;}
+        .post-title { font-size: 1.5rem; font-weight: 600; margin: 0; transition: color 0.2s; }
+        .post-desc { color: var(--gray); margin-top: 0.5rem; }
+
+        /* Article Styles */
+        article img { max-width: 100%; border-radius: 4px; }
+        article pre { background: #222; color: #fff; padding: 1rem; overflow-x: auto; border-radius: 4px; }
+        
+        /* Utilities */
+        .hidden { display: none; }
+        .loading { color: var(--gray); font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <main>
+        <header class="nav-header">
+            <a href="/" class="logo" data-link>goholic.in</a>
+            </header>
+
+        <div id="app">
+            </div>
+    </main>
+
+    <script>
+        // --- 1. State & Cache (Minimal) ---
+        const app = document.getElementById('app');
+        const API_BASE = '/api/posts'; // Relative path since we serve from same origin
+
+        // --- 2. The Router (Handle Navigation) ---
+        const router = async () => {
+            const path = window.location.pathname;
+            
+            if (path === '/' || path === '/index.html') {
+                await renderHome();
+            } else if (path.startsWith('/post/')) {
+                const slug = path.split('/post/')[1];
+                await renderPost(slug);
+            } else {
+                app.innerHTML = '<h1>404 - Lost in the void.</h1>';
+            }
+        };
+
+        // --- 3. Renderers ---
+
+        async function renderHome() {
+            app.innerHTML = '<div class="loading">Loading thoughts...</div>';
+            try {
+                const res = await fetch(API_BASE);
+                const posts = await res.json();
+                
+                if (!posts || posts.length === 0) {
+                    app.innerHTML = '<p>No ink spilled yet.</p>';
+                    return;
+                }
+
+                // Efficient DOM generation
+                const html = posts.map(p => `
+                    <a href="/post/${p.slug}" class="post-item" data-link>
+                        <span class="post-date">${new Date(p.published_at).toLocaleDateString()}</span>
+                        <h2 class="post-title">${p.title}</h2>
+                        <p class="post-desc">${p.description}</p>
+                    </a>
+                `).join('');
+                
+                app.innerHTML = html;
+                document.title = 'Goholic.in';
+            } catch (err) {
+                app.innerHTML = `<p style="color:red">API Error. Is Malt running?</p>`;
+            }
+        }
+
+        async function renderPost(slug) {
+            app.innerHTML = '<div class="loading">Fetching context...</div>';
+            try {
+                const res = await fetch(`${API_BASE}/${slug}`);
+                if (!res.ok) throw new Error('Post not found');
+                const post = await res.json();
+
+                // Inject Content
+                app.innerHTML = `
+                    <article>
+                        <header style="margin-bottom: 2rem;">
+                            <h1 style="font-size: 2rem; margin-bottom: 0.5rem;">${post.title}</h1>
+                            <time style="color: var(--gray);">${new Date(post.published_at).toLocaleDateString()}</time>
+                        </header>
+                        <div class="content">${post.content}</div>
+                    </article>
+                `;
+                
+                // Update SEO Meta (Client Side)
+                document.title = `${post.title} | Goholic`;
+            } catch (err) {
+                app.innerHTML = '<h1>404 - Post not found</h1><p><a href="/" data-link>Go back home</a></p>';
+            }
+        }
+
+        // --- 4. Event Listeners (SPA Feel) ---
+        
+        // Handle Back/Forward browser buttons
+        window.addEventListener('popstate', router);
+
+        // Intercept clicks for SPA navigation
+        document.body.addEventListener('click', e => {
+            if (e.target.matches('[data-link]') || e.target.closest('[data-link]')) {
+                e.preventDefault();
+                const link = e.target.matches('[data-link]') ? e.target : e.target.closest('[data-link]');
+                history.pushState(null, null, link.href);
+                router();
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', router);
+
+    </script>
+</body>
+</html>
